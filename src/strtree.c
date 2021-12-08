@@ -989,7 +989,12 @@ static PyObject* STRtree_nearest_all(STRtreeObject* self, PyObject* args) {
     }
 
     kv_destroy(dist_pairs);
+    float percentage = 0.0;
+    percentage = (float)i/n*100;
+    printf("\rIn progress at %.2f %%, working on number %d, total number of geometries %d", percentage, i, n);
+    fflush(stdout);
   }
+  printf("\n");
 
   GEOS_FINISH_THREADS;
 
