@@ -953,6 +953,10 @@ static PyObject* STRtree_nearest_all(STRtreeObject* self, PyObject* args) {
 
       if (query_counter == 0) {
         // no features are within max_distance, skip distance calculations
+        // add a placeholder if nothing is found
+        kv_push(npy_intp, src_indexes, i);
+        kv_push(GeometryObject**, nearest_geoms, NULL);
+        kv_push(double, nearest_dist, -1.0);
         continue;
       }
     }
@@ -974,6 +978,9 @@ static PyObject* STRtree_nearest_all(STRtreeObject* self, PyObject* args) {
       break;
     }
 
+    // add a flag to store information of whether a geometry within max_distance is found
+    int flag = 0;
+
     for (j = 0; j < kv_size(dist_pairs); j++) {
       distance = kv_A(dist_pairs, j).distance;
 
@@ -985,13 +992,24 @@ static PyObject* STRtree_nearest_all(STRtreeObject* self, PyObject* args) {
         kv_push(npy_intp, src_indexes, i);
         kv_push(GeometryObject**, nearest_geoms, kv_A(dist_pairs, j).geom);
         kv_push(double, nearest_dist, distance);
+        flag = 1;
       }
+    }
+    if (flag) {
+      // if something is found, pass
+      ;
+    }
+    else {
+      // if nothing is found, insert a placeholder
+      kv_push(npy_intp, src_indexes, i);
+      kv_push(GeometryObject**, nearest_geoms, NULL);
+      kv_push(double, nearest_dist, -1.0);
     }
 
     kv_destroy(dist_pairs);
     float percentage = 0.0;
-    percentage = (float)i/n*100;
-    printf("\rIn progress at %.2f %%, working on number %d, total number of geometries %d", percentage, i, n);
+    percentage = (float)(i+1)/n*100;
+    printf("\rIn progress at %.2f %%, working on number %d, total number of geometries %d", percentage, i+1, n);
     fflush(stdout);
   }
   printf("\n");
@@ -1024,9 +1042,16 @@ static PyObject* STRtree_nearest_all(STRtreeObject* self, PyObject* args) {
     // assign value into numpy arrays
     *(npy_intp*)PyArray_GETPTR2(result_indexes, 0, i) = kv_A(src_indexes, i);
 
-    // Calculate index using offset of its address compared to head of _geoms
-    geom_index =
-        (npy_intp)(((char*)kv_A(nearest_geoms, i) - head_ptr) / sizeof(GeometryObject*));
+    if (kv_A(nearest_geoms, i)){
+      // Calculate index using offset of its address compared to head of _geoms
+      geom_index = (npy_intp)(((char*)kv_A(nearest_geoms, i) - head_ptr) / sizeof(GeometryObject*));
+    }
+    else
+    {
+      // if a NULL placeholder is found, set the index to -1
+      geom_index = -1;
+    }
+
     *(npy_intp*)PyArray_GETPTR2(result_indexes, 1, i) = geom_index;
 
     *(double*)PyArray_GETPTR1(result_distances, i) = kv_A(nearest_dist, i);
