@@ -8,6 +8,8 @@ A progress bar is added when calling the function `nearest_all` of a `STRtree` o
 for the project *Firm adaptation and production networks: structural evidence from extreme weather events in Pakistan* 
 by Balboni, Boehm, and Waseem (forthcoming).
 
+----------------
+
 .. Documentation at RTD — https://readthedocs.org
 
 .. image:: https://readthedocs.org/projects/pygeos/badge/?version=latest
