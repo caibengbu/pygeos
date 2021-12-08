@@ -4,7 +4,7 @@ PyGEOS
 
 What is different in this fork?
 ----------------
-A progress bar is added when calling the function `nearest_all` of a `STRtree` object, 
+A progress bar is added when calling the function ``nearest_all`` of a ``STRtree`` object, 
 for the project *Firm adaptation and production networks: structural evidence from extreme weather events in Pakistan* 
 by Balboni, Boehm, and Waseem (forthcoming).
 
