@@ -4,10 +4,8 @@ PyGEOS
 
 What is different in this fork?
 ----------------
-A progress bar is added when calling the function ``nearest_all`` of a ``STRtree`` object, 
-a feature customized for the project *Firm adaptation and production networks: structural evidence from extreme weather events in Pakistan* 
-by Balboni, Boehm, and Waseem (forthcoming).
-
+- A progress bar is added when calling the function ``nearest_all`` of a ``STRtree`` object, a feature customized for the project *Firm adaptation and production networks: structural evidence from extreme weather events in Pakistan* by Balboni, Boehm, and Waseem (forthcoming).
+- The returned array of ``nearest_all`` with a valid value for argument ``max_distance`` also include geometries that was farther to the tree than ``max_distance``. For these geometries, a distance of ``-1`` and a tree index of ``-1`` is returned.
 ----------------
 
 .. Documentation at RTD — https://readthedocs.org
