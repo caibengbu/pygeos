@@ -1255,8 +1255,14 @@ static PyObject* STRtree_dwithin(STRtreeObject* self, PyObject* args) {
         kv_push(npy_intp, src_indexes, i);
         kv_push(GeometryObject**, target_geoms, target_geom_loc);
       }
+        
+      float percentage = 0.0;
+      percentage = (float)j/size*100;
+      printf("\rIn progress at %.2f %%, working on number %d, total number of geometry in the tree %d", percentage, j, size);
+      fflush(stdout);
     }
-
+    printf("\n");
+    
     kv_destroy(query_geoms);
 
     // only if we created prepared_geom_tmp here, destroy it
