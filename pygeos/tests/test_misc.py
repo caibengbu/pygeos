@@ -1,7 +1,7 @@
 import os
 import sys
 from itertools import chain
-from string import ascii_lowercase
+from string import ascii_letters, digits
 from unittest import mock
 
 import numpy as np
@@ -33,7 +33,10 @@ def test_geos_version():
     actual = pygeos.geos_version_string
 
     # strip any beta / dev qualifiers
-    actual = actual.lower().rstrip(ascii_lowercase)
+    if any(c.isalpha() for c in actual):
+        if actual[-1].isnumeric():
+            actual = actual.rstrip(digits)
+        actual = actual.rstrip(ascii_letters)
 
     assert actual == expected
 
@@ -53,7 +56,11 @@ def test_geos_capi_version():
         actual_geos_api_version,
     ) = pygeos.geos_capi_version_string.split("-CAPI-")
 
-    actual_geos_version = actual_geos_version.lower().rstrip(ascii_lowercase)
+    if any(c.isalpha() for c in actual_geos_version):
+        if actual_geos_version[-1].isnumeric():
+            actual_geos_version = actual_geos_version.rstrip(digits)
+        actual_geos_version = actual_geos_version.rstrip(ascii_letters)
+    actual_geos_version = actual_geos_version.rstrip(ascii_letters)
 
     assert (
         "{0}-CAPI-{1}".format(actual_geos_version, actual_geos_api_version) == expected
@@ -68,13 +75,22 @@ def func():
     """
 
 
+class SomeClass:
+    def func(self):
+        """Docstring that will be mocked.
+        A multiline.
+
+        Some description.
+        """
+
+
 expected_docstring = """Docstring that will be mocked.
-    A multiline.
+{indent}A multiline.
 
-    .. note:: 'func' requires at least GEOS {}.
+{indent}.. note:: 'func' requires at least GEOS {version}.
 
-    Some description.
-    """
+{indent}Some description.
+{indent}"""
 
 
 @pytest.mark.parametrize("version", ["3.7.0", "3.7.1", "3.6.2"])
@@ -89,7 +105,7 @@ def test_requires_geos_not_ok(version, mocked_geos_version):
     with pytest.raises(pygeos.UnsupportedGEOSOperation):
         wrapped()
 
-    assert wrapped.__doc__ == expected_docstring.format(version)
+    assert wrapped.__doc__ == expected_docstring.format(version=version, indent=" " * 4)
 
 
 @pytest.mark.parametrize("version", ["3.6.0", "3.8.0"])
@@ -97,7 +113,15 @@ def test_requires_geos_doc_build(version, mocked_geos_version, sphinx_doc_build)
     """The requires_geos decorator always adapts the docstring."""
     wrapped = requires_geos(version)(func)
 
-    assert wrapped.__doc__ == expected_docstring.format(version)
+    assert wrapped.__doc__ == expected_docstring.format(version=version, indent=" " * 4)
+
+
+@pytest.mark.parametrize("version", ["3.6.0", "3.8.0"])
+def test_requires_geos_method(version, mocked_geos_version, sphinx_doc_build):
+    """The requires_geos decorator adjusts methods docstrings correctly"""
+    wrapped = requires_geos(version)(SomeClass.func)
+
+    assert wrapped.__doc__ == expected_docstring.format(version=version, indent=" " * 8)
 
 
 @multithreading_enabled

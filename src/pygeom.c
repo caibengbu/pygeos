@@ -65,17 +65,31 @@ static PyMemberDef GeometryObject_members[] = {
 static PyObject* GeometryObject_ToWKT(GeometryObject* obj) {
   char* wkt;
   PyObject* result;
-  if (obj->ptr == NULL) {
+  GEOSGeometry* geom = obj->ptr;
+
+  if (geom == NULL) {
     Py_INCREF(Py_None);
     return Py_None;
   }
 
   GEOS_INIT;
 
-  errstate = check_to_wkt_compatible(ctx, obj->ptr);
+#if GEOS_SINCE_3_9_0
+  errstate = wkt_empty_3d_geometry(ctx, geom, &wkt);
   if (errstate != PGERR_SUCCESS) {
     goto finish;
   }
+  if (wkt != NULL) {
+    result = PyUnicode_FromString(wkt);
+    goto finish;
+  }
+#else
+  // Before GEOS 3.9.0, there was as segfault on e.g. MULTIPOINT (1 1, EMPTY)
+  errstate = check_to_wkt_compatible(ctx, geom);
+  if (errstate != PGERR_SUCCESS) {
+    goto finish;
+  }
+#endif
 
   GEOSWKTWriter* writer = GEOSWKTWriter_create_r(ctx);
   if (writer == NULL) {
@@ -98,7 +112,7 @@ static PyObject* GeometryObject_ToWKT(GeometryObject* obj) {
     goto finish;
   }
 
-  wkt = GEOSWKTWriter_write_r(ctx, writer, obj->ptr);
+  wkt = GEOSWKTWriter_write_r(ctx, writer, geom);
   result = PyUnicode_FromString(wkt);
   GEOSFree_r(ctx, wkt);
   GEOSWKTWriter_destroy_r(ctx, writer);
@@ -126,8 +140,8 @@ static PyObject* GeometryObject_ToWKB(GeometryObject* obj) {
 
   GEOS_INIT;
 
-#if !GEOS_SINCE_3_10_0
-  // WKB Does not allow empty points in GEOS < 3.10.
+#if !GEOS_SINCE_3_9_0
+  // WKB Does not allow empty points in GEOS < 3.9.
   // We check for that and patch the POINT EMPTY if necessary
   has_empty = has_point_empty(ctx, obj->ptr);
   if (has_empty == 2) {
@@ -141,7 +155,7 @@ static PyObject* GeometryObject_ToWKB(GeometryObject* obj) {
   }
 #else
   geom = obj->ptr;
-#endif  // !GEOS_SINCE_3_10_0
+#endif  // !GEOS_SINCE_3_9_0
 
   /* Create the WKB writer */
   writer = GEOSWKBWriter_create_r(ctx);
@@ -424,14 +438,14 @@ int __Pyx_InBases(PyTypeObject* a, PyTypeObject* b) {
 /* Get a GEOSGeometry pointer from a GeometryObject, or NULL if the input is
 Py_None. Returns 0 on error, 1 on success. */
 char get_geom(GeometryObject* obj, GEOSGeometry** out) {
+  // Numpy treats NULL the same as Py_None
+  if ((obj == NULL) || ((PyObject*)obj == Py_None)) {
+    *out = NULL;
+    return 1;
+  }
   PyTypeObject* type = ((PyObject*)obj)->ob_type;
   if ((type != &GeometryType) && !(__Pyx_InBases(type, &GeometryType))) {
-    if ((PyObject*)obj == Py_None) {
-      *out = NULL;
-      return 1;
-    } else {
-      return 0;
-    }
+    return 0;
   } else {
     *out = obj->ptr;
     return 1;

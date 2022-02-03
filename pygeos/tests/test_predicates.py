@@ -1,10 +1,21 @@
+from functools import partial
+
 import numpy as np
 import pytest
 
 import pygeos
 from pygeos import Geometry
 
-from .common import all_types, empty, geometry_collection, point, polygon
+from .common import (
+    all_types,
+    empty,
+    geometry_collection,
+    ignore_invalid,
+    line_string,
+    linear_ring,
+    point,
+    polygon,
+)
 
 UNARY_PREDICATES = (
     pygeos.is_empty,
@@ -31,15 +42,19 @@ BINARY_PREDICATES = (
     pygeos.contains,
     pygeos.contains_properly,
     pygeos.overlaps,
-    pygeos.equals,
     pygeos.covers,
     pygeos.covered_by,
+    pytest.param(
+        partial(pygeos.dwithin, distance=1.0),
+        marks=pytest.mark.skipif(
+            pygeos.geos_version < (3, 10, 0), reason="GEOS < 3.10"
+        ),
+    ),
+    pygeos.equals,
     pygeos.equals_exact,
 )
 
-BINARY_PREPARED_PREDICATES = tuple(
-    set(BINARY_PREDICATES) - {pygeos.equals, pygeos.equals_exact}
-)
+BINARY_PREPARED_PREDICATES = BINARY_PREDICATES[:-2]
 
 
 @pytest.mark.parametrize("geometry", all_types)
@@ -69,7 +84,10 @@ def test_unary_missing(func):
 @pytest.mark.parametrize("a", all_types)
 @pytest.mark.parametrize("func", BINARY_PREDICATES)
 def test_binary_array(a, func):
-    actual = func([a, a], point)
+    with ignore_invalid(pygeos.is_empty(a)):
+        # Empty geometries give 'invalid value encountered' in all predicates
+        # (see https://github.com/libgeos/geos/issues/515)
+        actual = func([a, a], point)
     assert actual.shape == (2,)
     assert actual.dtype == np.bool_
 
@@ -103,6 +121,39 @@ def test_equals_exact_tolerance():
     assert pygeos.equals_exact(p1, p1).item() is True
     assert pygeos.equals_exact(p1, p2).item() is False
 
+    # an array of tolerances
+    actual = pygeos.equals_exact(p1, p2, tolerance=[0.05, 0.2, np.nan])
+    np.testing.assert_allclose(actual, [False, True, False])
+
+
+@pytest.mark.skipif(pygeos.geos_version < (3, 10, 0), reason="GEOS < 3.10")
+def test_dwithin():
+    p1 = pygeos.points(50, 4)
+    p2 = pygeos.points(50.1, 4.1)
+    actual = pygeos.dwithin([p1, p2, None], p1, distance=0.05)
+    np.testing.assert_equal(actual, [True, False, False])
+    assert actual.dtype == np.bool_
+    actual = pygeos.dwithin([p1, p2, None], p1, distance=0.2)
+    np.testing.assert_allclose(actual, [True, True, False])
+    assert actual.dtype == np.bool_
+
+    # an array of distances
+    actual = pygeos.dwithin(p1, p2, distance=[0.05, 0.2, np.nan])
+    np.testing.assert_allclose(actual, [False, True, False])
+
+
+@pytest.mark.parametrize(
+    "geometry,expected",
+    [
+        (point, False),
+        (line_string, False),
+        (linear_ring, True),
+        (empty, False),
+    ],
+)
+def test_is_closed(geometry, expected):
+    assert pygeos.is_closed(geometry) == expected
+
 
 def test_relate():
     p1 = pygeos.points(0, 0)
@@ -127,7 +178,10 @@ def test_relate_pattern():
 
 
 def test_relate_pattern_empty():
-    assert pygeos.relate_pattern(empty, empty, "*" * 9).item() is True
+    with ignore_invalid():
+        # Empty geometries give 'invalid value encountered' in all predicates
+        # (see https://github.com/libgeos/geos/issues/515)
+        assert pygeos.relate_pattern(empty, empty, "*" * 9).item() is True
 
 
 @pytest.mark.parametrize("g1, g2", [(point, None), (None, point), (None, None)])
@@ -184,8 +238,11 @@ def _prepare_with_copy(geometry):
 @pytest.mark.parametrize("a", all_types)
 @pytest.mark.parametrize("func", BINARY_PREPARED_PREDICATES)
 def test_binary_prepared(a, func):
-    actual = func(a, point)
-    result = func(_prepare_with_copy(a), point)
+    with ignore_invalid(pygeos.is_empty(a)):
+        # Empty geometries give 'invalid value encountered' in all predicates
+        # (see https://github.com/libgeos/geos/issues/515)
+        actual = func(a, point)
+        result = func(_prepare_with_copy(a), point)
     assert actual == result
 
 

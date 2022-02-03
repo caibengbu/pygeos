@@ -1,10 +1,12 @@
+import warnings
 from enum import IntEnum
 
 import numpy as np
 
 from . import Geometry  # NOQA
-from . import _geometry, lib
+from . import _geometry, geos_version, lib
 from .decorators import multithreading_enabled, requires_geos
+from .enum import ParamEnum
 
 __all__ = [
     "GeometryType",
@@ -28,6 +30,8 @@ __all__ = [
     "get_rings",
     "get_precision",
     "set_precision",
+    "force_2d",
+    "force_3d",
 ]
 
 
@@ -89,7 +93,7 @@ def get_dimensions(geometry, **kwargs):
 
     The inherent dimension is 0 for points, 1 for linestrings and linearrings,
     and 2 for polygons. For geometrycollections it is the max of the containing
-    elements. Empty and None geometries return -1.
+    elements. Empty collections and None values return -1.
 
     Parameters
     ----------
@@ -118,7 +122,8 @@ def get_dimensions(geometry, **kwargs):
 def get_coordinate_dimension(geometry, **kwargs):
     """Returns the dimensionality of the coordinates in a geometry (2 or 3).
 
-    Returns -1 for not-a-geometry values.
+    Returns -1 for missing geometries (``None`` values). Note that if the first Z
+    coordinate equals ``nan``, this function will return ``2``.
 
     Parameters
     ----------
@@ -135,6 +140,8 @@ def get_coordinate_dimension(geometry, **kwargs):
     3
     >>> get_coordinate_dimension(None)
     -1
+    >>> get_coordinate_dimension(Geometry("POINT Z (0 0 nan)"))
+    2
     """
     return lib.get_coordinate_dimension(geometry, **kwargs)
 
@@ -681,9 +688,15 @@ def get_precision(geometry, **kwargs):
     return lib.get_precision(geometry, **kwargs)
 
 
+class SetPrecisionMode(ParamEnum):
+    valid_output = 0
+    pointwise = 1
+    keep_collapsed = 2
+
+
 @requires_geos("3.6.0")
 @multithreading_enabled
-def set_precision(geometry, grid_size, preserve_topology=False, **kwargs):
+def set_precision(geometry, grid_size, mode="valid_output", **kwargs):
     """Returns geometry with the precision set to a precision grid size.
 
     By default, geometries use double precision coordinates (grid_size = 0).
@@ -711,9 +724,25 @@ def set_precision(geometry, grid_size, preserve_topology=False, **kwargs):
         geometry if precision grid size was not previously set). If this
         value is more precise than input geometry, the input geometry will
         not be modified.
-    preserve_topology : bool, default False
-        If True, will attempt to preserve the topology of a geometry after
-        rounding coordinates.
+    mode :  {'valid_output', 'pointwise', 'keep_collapsed'}, default 'valid_output'
+        This parameter determines how to handle invalid output geometries. There are three modes:
+
+        1. `'valid_output'` (default):  The output is always valid. Collapsed geometry elements
+           (including both polygons and lines) are removed. Duplicate vertices are removed.
+        2. `'pointwise'`: Precision reduction is performed pointwise. Output geometry
+           may be invalid due to collapse or self-intersection. Duplicate vertices are not
+           removed. In GEOS this option is called NO_TOPO.
+
+           .. note::
+
+             'pointwise' mode requires at least GEOS 3.10. It is accepted in earlier versions,
+             but the results may be unexpected.
+        3. `'keep_collapsed'`: Like the default mode, except that collapsed linear geometry
+           elements are preserved. Collapsed polygonal input elements are removed. Duplicate
+           vertices are removed.
+    preserve_topology : bool, optional
+        .. deprecated:: 0.11
+          This parameter is ignored. Use ``mode`` instead.
     **kwargs
         For other keyword-only arguments, see the
         `NumPy ufunc docs <https://numpy.org/doc/stable/reference/ufuncs.html#ufuncs-kwargs>`_.
@@ -730,8 +759,91 @@ def set_precision(geometry, grid_size, preserve_topology=False, **kwargs):
     <pygeos.Geometry POINT Z (1 1 0.9)>
     >>> set_precision(Geometry("LINESTRING (0 0, 0 0.1, 0 1, 1 1)"), 1.0)
     <pygeos.Geometry LINESTRING (0 0, 0 1, 1 1)>
+    >>> set_precision(Geometry("LINESTRING (0 0, 0 0.1, 0.1 0.1)"), 1.0, mode="valid_output")
+    <pygeos.Geometry LINESTRING Z EMPTY>
+    >>> set_precision(Geometry("LINESTRING (0 0, 0 0.1, 0.1 0.1)"), 1.0, mode="pointwise")
+    <pygeos.Geometry LINESTRING (0 0, 0 0, 0 0)>
+    >>> set_precision(Geometry("LINESTRING (0 0, 0 0.1, 0.1 0.1)"), 1.0, mode="keep_collapsed")
+    <pygeos.Geometry LINESTRING (0 0, 0 0)>
     >>> set_precision(None, 1.0) is None
     True
     """
+    if isinstance(mode, str):
+        mode = SetPrecisionMode.get_value(mode)
+    elif not np.isscalar(mode):
+        raise TypeError("mode only accepts scalar values")
+    if "preserve_topology" in kwargs:
+        warnings.warn(
+            "preserve_topology is deprecated (ignored), use 'mode' instead",
+            UserWarning,
+            stacklevel=2,
+        )
+        del kwargs["preserve_topology"]
+    if mode == SetPrecisionMode.pointwise and geos_version < (3, 10, 0):
+        warnings.warn(
+            "'pointwise' is only supported for GEOS 3.10",
+            UserWarning,
+            stacklevel=2,
+        )
+    return lib.set_precision(geometry, grid_size, np.intc(mode), **kwargs)
 
-    return lib.set_precision(geometry, grid_size, preserve_topology, **kwargs)
+
+@multithreading_enabled
+def force_2d(geometry, **kwargs):
+    """Forces the dimensionality of a geometry to 2D.
+
+    Parameters
+    ----------
+    geometry : Geometry or array_like
+    **kwargs
+        For other keyword-only arguments, see the
+        `NumPy ufunc docs <https://numpy.org/doc/stable/reference/ufuncs.html#ufuncs-kwargs>`_.
+
+    Examples
+    --------
+    >>> force_2d(Geometry("POINT Z (0 0 0)"))
+    <pygeos.Geometry POINT (0 0)>
+    >>> force_2d(Geometry("POINT (0 0)"))
+    <pygeos.Geometry POINT (0 0)>
+    >>> force_2d(Geometry("LINESTRING (0 0 0, 0 1 1, 1 1 2)"))
+    <pygeos.Geometry LINESTRING (0 0, 0 1, 1 1)>
+    >>> force_2d(Geometry("POLYGON Z EMPTY"))
+    <pygeos.Geometry POLYGON EMPTY>
+    >>> force_2d(None) is None
+    True
+    """
+    return lib.force_2d(geometry, **kwargs)
+
+
+@multithreading_enabled
+def force_3d(geometry, z=0.0, **kwargs):
+    """Forces the dimensionality of a geometry to 3D.
+
+    2D geometries will get the provided Z coordinate; Z coordinates of 3D geometries
+    are unchanged (unless they are nan).
+
+    Note that for empty geometries, 3D is only supported since GEOS 3.9 and then
+    still only for simple geometries (non-collections).
+
+    Parameters
+    ----------
+    geometry : Geometry or array_like
+    z : float or array_like, default 0.0
+    **kwargs
+        For other keyword-only arguments, see the
+        `NumPy ufunc docs <https://numpy.org/doc/stable/reference/ufuncs.html#ufuncs-kwargs>`_.
+
+    Examples
+    --------
+    >>> force_3d(Geometry("POINT (0 0)"), z=3)
+    <pygeos.Geometry POINT Z (0 0 3)>
+    >>> force_3d(Geometry("POINT Z (0 0 0)"), z=3)
+    <pygeos.Geometry POINT Z (0 0 0)>
+    >>> force_3d(Geometry("LINESTRING (0 0, 0 1, 1 1)"))
+    <pygeos.Geometry LINESTRING Z (0 0 0, 0 1 0, 1 1 0)>
+    >>> force_3d(None) is None
+    True
+    """
+    if np.isnan(z).any():
+        raise ValueError("It is not allowed to set the Z coordinate to NaN.")
+    return lib.force_3d(geometry, z, **kwargs)

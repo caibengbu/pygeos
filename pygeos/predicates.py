@@ -23,6 +23,7 @@ __all__ = [
     "covered_by",
     "covers",
     "disjoint",
+    "dwithin",
     "equals",
     "intersects",
     "overlaps",
@@ -38,6 +39,9 @@ __all__ = [
 def has_z(geometry, **kwargs):
     """Returns True if a geometry has a Z coordinate.
 
+    Note that this function returns False if the (first) Z coordinate equals NaN or
+    if the geometry is empty.
+
     Parameters
     ----------
     geometry : Geometry or array_like
@@ -45,12 +49,18 @@ def has_z(geometry, **kwargs):
         For other keyword-only arguments, see the
         `NumPy ufunc docs <https://numpy.org/doc/stable/reference/ufuncs.html#ufuncs-kwargs>`_.
 
+    See also
+    --------
+    get_coordinate_dimension
+
     Examples
     --------
     >>> has_z(Geometry("POINT (0 0)"))
     False
     >>> has_z(Geometry("POINT Z (0 0 0)"))
     True
+    >>> has_z(Geometry("POINT Z(0 0 nan)"))
+    False
     """
     return lib.has_z(geometry, **kwargs)
 
@@ -399,7 +409,7 @@ def is_valid_reason(geometry, **kwargs):
     >>> is_valid_reason(Geometry("LINESTRING(0 0, 1 1)"))
     'Valid Geometry'
     >>> is_valid_reason(Geometry("POLYGON((0 0, 1 1, 1 2, 1 1, 0 0))"))
-    'Self-intersection[0 0]'
+    'Ring Self-intersection[1 1]'
     >>> is_valid_reason(None) is None
     True
     """
@@ -992,3 +1002,41 @@ def relate_pattern(a, b, pattern, **kwargs):
     True
     """
     return lib.relate_pattern(a, b, pattern, **kwargs)
+
+
+@multithreading_enabled
+@requires_geos("3.10.0")
+def dwithin(a, b, distance, **kwargs):
+    """
+    Returns True if the geometries are within a given distance.
+
+    Using this function is more efficient than computing the distance and
+    comparing the result.
+
+    Parameters
+    ----------
+    a, b : Geometry or array_like
+    distance : float
+        Negative distances always return False.
+    **kwargs
+        For other keyword-only arguments, see the
+        `NumPy ufunc docs <https://numpy.org/doc/stable/reference/ufuncs.html#ufuncs-kwargs>`_.
+
+    See also
+    --------
+    distance : compute the actual distance between A and B
+    prepare : improve performance by preparing ``a`` (the first argument)
+
+    Examples
+    --------
+    >>> point = Geometry("POINT (0.5 0.5)")
+    >>> dwithin(point, Geometry("POINT (2 0.5)"), 2)
+    True
+    >>> dwithin(point, Geometry("POINT (2 0.5)"), [2, 1.5, 1]).tolist()
+    [True, True, False]
+    >>> dwithin(point, Geometry("POINT (0.5 0.5)"), 0)
+    True
+    >>> dwithin(point, None, 100)
+    False
+    """
+    return lib.dwithin(a, b, distance, **kwargs)

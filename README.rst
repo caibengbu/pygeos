@@ -19,19 +19,9 @@ These features are customized for the project *Firm adaptation and production ne
 
 .. Github Actions status — https://github.com/pygeos/pygeos/actions
 
-.. image:: https://github.com/pygeos/pygeos/workflows/Linux/badge.svg
+.. image:: https://github.com/pygeos/pygeos/workflows/Test/badge.svg
 	:alt: Github Actions status
-	:target: https://github.com/pygeos/pygeos/actions/workflows/test-linux.yml?query=branch%3Amaster
-
-.. image:: https://github.com/pygeos/pygeos/workflows/Conda/badge.svg
-	:alt: Github Actions status
-	:target: https://github.com/pygeos/pygeos/actions/workflows/test-conda.yml?query=branch%3Amaster
-
-.. Appveyor CI status — https://ci.appveyor.com
-
-.. image:: https://ci.appveyor.com/api/projects/status/jw48gpd88f188av6/branch/master?svg=true
-	:alt: Appveyor CI status
-	:target: https://ci.appveyor.com/project/caspervdw/pygeos-3e5cu/branch/master
+	:target: https://github.com/pygeos/pygeos/actions/workflows/test-pip.yml?query=branch%3Amaster
 
 .. Travis CI status -- https://travis-ci.com
 
@@ -63,9 +53,11 @@ operations are done in the open-source geometry library GEOS. PyGEOS wraps
 these operations in NumPy ufuncs providing a performance improvement when
 operating on arrays of geometries.
 
-Note: PyGEOS is a very young package. While the available functionality should
-be stable and working correctly, it's still possible that APIs change in upcoming
-releases. But we would love for you to try it out, give feedback or contribute!
+**Important note**: PyGEOS was merged with Shapely (https://shapely.readthedocs.io)
+in December 2021 and will be released as part of Shapely 2.0. The development will take place
+at the Shapely repository. Please raise issues or create pull request over there.
+PyGEOS itself will receive updates (by backporting from the Shapely repository) until
+Shapely 2.0 is actually released.
 
 What is a ufunc?
 ----------------
@@ -122,25 +114,10 @@ Compute the area of all possible intersections of two lists of polygons:
 See the documentation for more: https://pygeos.readthedocs.io
 
 
-Relationship to Shapely
------------------------
-
-Both Shapely and PyGEOS are exposing the functionality of the GEOS C++ library
-to Python. While Shapely only deals with single geometries, PyGEOS provides
-vectorized functions to work with arrays of geometries, giving better
-performance and convenience for such usecases.
-
-There is active discussion and work toward integrating PyGEOS into Shapely:
-
-* latest proposal: https://github.com/shapely/shapely-rfc/pull/1
-* prior discussion: https://github.com/Toblerity/Shapely/issues/782
-
-For now PyGEOS is developed as a separate project.
-
 References
 ----------
 
-- GEOS: http://trac.osgeo.org/geos
+- GEOS: https://libgeos.org
 - Shapely: https://shapely.readthedocs.io/en/latest/
 - Numpy ufuncs: https://docs.scipy.org/doc/numpy/reference/ufuncs.html
 - Joris van den Bossche's blogpost: https://jorisvandenbossche.github.io/blog/2017/09/19/geopandas-cython/
@@ -151,4 +128,4 @@ Copyright & License
 -------------------
 
 PyGEOS is licensed under BSD 3-Clause license. Copyright (c) 2019, Casper van der Wel.
-GEOS is available under the terms of ​GNU Lesser General Public License (LGPL) 2.1 at https://trac.osgeo.org/geos.
+GEOS is available under the terms of ​GNU Lesser General Public License (LGPL) 2.1 at https://libgeos.org.

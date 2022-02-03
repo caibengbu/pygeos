@@ -16,6 +16,7 @@ __all__ = [
     "box",
     "prepare",
     "destroy_prepared",
+    "empty",
 ]
 
 
@@ -30,11 +31,8 @@ def _xyz_to_coords(x, y, z):
 
 
 @multithreading_enabled
-def points(coords, y=None, z=None, indices=None, **kwargs):
+def points(coords, y=None, z=None, indices=None, out=None, **kwargs):
     """Create an array of points.
-
-    Note that GEOS >=3.10 automatically converts POINT (nan nan) to
-    POINT EMPTY.
 
     Parameters
     ----------
@@ -47,7 +45,10 @@ def points(coords, y=None, z=None, indices=None, **kwargs):
         Indices into the target array where input coordinates belong. If
         provided, the coords should be 2D with shape (N, 2) or (N, 3) and
         indices should be an array of shape (N,) with integers in increasing
-        order. Missing indices will result in a ValueError.
+        order. Missing indices result in a ValueError unless ``out`` is
+        provided, in which case the original value in ``out`` is kept.
+    out : ndarray, optional
+        An array (with dtype object) to output the geometries into.
     **kwargs
         For other keyword-only arguments, see the
         `NumPy ufunc docs <https://numpy.org/doc/stable/reference/ufuncs.html#ufuncs-kwargs>`_.
@@ -59,16 +60,23 @@ def points(coords, y=None, z=None, indices=None, **kwargs):
     [<pygeos.Geometry POINT (0 1)>, <pygeos.Geometry POINT (4 5)>]
     >>> points([0, 1, 2])
     <pygeos.Geometry POINT Z (0 1 2)>
+
+    Notes
+    -----
+
+    - GEOS >=3.10 automatically converts POINT (nan nan) to POINT EMPTY.
+    - Usage of the ``y`` and ``z`` arguments will prevents lazy evaluation in ``dask``.
+      Instead provide the coordinates as an array with shape ``(..., 2)`` or ``(..., 3)`` using only the ``coords`` argument.
     """
     coords = _xyz_to_coords(coords, y, z)
     if indices is None:
-        return lib.points(coords, **kwargs)
+        return lib.points(coords, out=out, **kwargs)
     else:
-        return simple_geometries_1d(coords, indices, GeometryType.POINT)
+        return simple_geometries_1d(coords, indices, GeometryType.POINT, out=out)
 
 
 @multithreading_enabled
-def linestrings(coords, y=None, z=None, indices=None, **kwargs):
+def linestrings(coords, y=None, z=None, indices=None, out=None, **kwargs):
     """Create an array of linestrings.
 
     This function will raise an exception if a linestring contains less than
@@ -85,7 +93,10 @@ def linestrings(coords, y=None, z=None, indices=None, **kwargs):
         Indices into the target array where input coordinates belong. If
         provided, the coords should be 2D with shape (N, 2) or (N, 3) and
         indices should be an array of shape (N,) with integers in increasing
-        order. Missing indices will result in a ValueError.
+        order. Missing indices result in a ValueError unless ``out`` is
+        provided, in which case the original value in ``out`` is kept.
+    out : ndarray, optional
+        An array (with dtype object) to output the geometries into.
     **kwargs
         For other keyword-only arguments, see the
         `NumPy ufunc docs <https://numpy.org/doc/stable/reference/ufuncs.html#ufuncs-kwargs>`_.
@@ -97,19 +108,25 @@ def linestrings(coords, y=None, z=None, indices=None, **kwargs):
     [<pygeos.Geometry LINESTRING (0 1, 4 5)>, <pygeos.Geometry LINESTRING (2 3, 5 6)>]
     >>> linestrings([[0, 1], [4, 5], [2, 3], [5, 6], [7, 8]], indices=[0, 0, 1, 1, 1]).tolist()
     [<pygeos.Geometry LINESTRING (0 1, 4 5)>, <pygeos.Geometry LINESTRING (2 3, 5 6, 7 8)>]
+
+    Notes
+    -----
+    - Usage of the ``y`` and ``z`` arguments will prevents lazy evaluation in ``dask``.
+      Instead provide the coordinates as a ``(..., 2)`` or ``(..., 3)`` array using only ``coords``.
     """
     coords = _xyz_to_coords(coords, y, z)
     if indices is None:
-        return lib.linestrings(coords, **kwargs)
+        return lib.linestrings(coords, out=out, **kwargs)
     else:
-        return simple_geometries_1d(coords, indices, GeometryType.LINESTRING)
+        return simple_geometries_1d(coords, indices, GeometryType.LINESTRING, out=out)
 
 
 @multithreading_enabled
-def linearrings(coords, y=None, z=None, indices=None, **kwargs):
+def linearrings(coords, y=None, z=None, indices=None, out=None, **kwargs):
     """Create an array of linearrings.
 
-    If the provided coords do not constitute a closed linestring, the first
+    If the provided coords do not constitute a closed linestring, or if there
+    are only 3 provided coords, the first
     coordinate is duplicated at the end to close the ring. This function will
     raise an exception if a linearring contains less than three points or if
     the terminal coordinates contain NaN (not-a-number).
@@ -125,7 +142,10 @@ def linearrings(coords, y=None, z=None, indices=None, **kwargs):
         Indices into the target array where input coordinates belong. If
         provided, the coords should be 2D with shape (N, 2) or (N, 3) and
         indices should be an array of shape (N,) with integers in increasing
-        order. Missing indices will result in a ValueError.
+        order. Missing indices result in a ValueError unless ``out`` is
+        provided, in which case the original value in ``out`` is kept.
+    out : ndarray, optional
+        An array (with dtype object) to output the geometries into.
     **kwargs
         For other keyword-only arguments, see the
         `NumPy ufunc docs <https://numpy.org/doc/stable/reference/ufuncs.html#ufuncs-kwargs>`_.
@@ -141,16 +161,21 @@ def linearrings(coords, y=None, z=None, indices=None, **kwargs):
     <pygeos.Geometry LINEARRING (0 0, 0 1, 1 1, 0 0)>
     >>> linearrings([[0, 0], [0, 1], [1, 1]])
     <pygeos.Geometry LINEARRING (0 0, 0 1, 1 1, 0 0)>
+
+    Notes
+    -----
+    - Usage of the ``y`` and ``z`` arguments will prevents lazy evaluation in ``dask``.
+      Instead provide the coordinates as a ``(..., 2)`` or ``(..., 3)`` array using only ``coords``.
     """
     coords = _xyz_to_coords(coords, y, z)
     if indices is None:
-        return lib.linearrings(coords, **kwargs)
+        return lib.linearrings(coords, out=out, **kwargs)
     else:
-        return simple_geometries_1d(coords, indices, GeometryType.LINEARRING)
+        return simple_geometries_1d(coords, indices, GeometryType.LINEARRING, out=out)
 
 
 @multithreading_enabled
-def polygons(geometries, holes=None, indices=None, **kwargs):
+def polygons(geometries, holes=None, indices=None, out=None, **kwargs):
     """Create an array of polygons.
 
     Parameters
@@ -169,8 +194,10 @@ def polygons(geometries, holes=None, indices=None, **kwargs):
         the first geometry for each index is the outer shell
         and all subsequent geometries in that index are the holes.
         Both geometries and indices should be 1D and have matching sizes.
-        Indices should be in increasing order. Missing indices will result
-        in a ValueError.
+        Indices should be in increasing order. Missing indices result in a ValueError
+        unless ``out`` is  provided, in which case the original value in ``out`` is kept.
+    out : ndarray, optional
+        An array (with dtype object) to output the geometries into.
     **kwargs
         For other keyword-only arguments, see the
         `NumPy ufunc docs <https://numpy.org/doc/stable/reference/ufuncs.html#ufuncs-kwargs>`_.
@@ -225,7 +252,7 @@ def polygons(geometries, holes=None, indices=None, **kwargs):
     if indices is not None:
         if holes is not None:
             raise TypeError("Cannot specify separate holes array when using indices.")
-        return collections_1d(geometries, indices, GeometryType.POLYGON)
+        return collections_1d(geometries, indices, GeometryType.POLYGON, out=out)
 
     if holes is None:
         # no holes provided: initialize an empty holes array matching shells
@@ -237,7 +264,7 @@ def polygons(geometries, holes=None, indices=None, **kwargs):
         if np.issubdtype(holes.dtype, np.number):
             holes = linearrings(holes)
 
-    return lib.polygons(geometries, holes, **kwargs)
+    return lib.polygons(geometries, holes, out=out, **kwargs)
 
 
 @multithreading_enabled
@@ -271,7 +298,7 @@ def box(xmin, ymin, xmax, ymax, ccw=True, **kwargs):
 
 
 @multithreading_enabled
-def multipoints(geometries, indices=None, **kwargs):
+def multipoints(geometries, indices=None, out=None, **kwargs):
     """Create multipoints from arrays of points
 
     Parameters
@@ -281,8 +308,11 @@ def multipoints(geometries, indices=None, **kwargs):
     indices : array_like, optional
         Indices into the target array where input geometries belong. If
         provided, both geometries and indices should be 1D and have matching
-        sizes. Indices should be in increasing order. Missing indices will result
-        in a ValueError.
+        sizes. Indices should be in increasing order. Missing indices result
+        in a ValueError unless ``out`` is  provided, in which case the original
+        value in ``out`` is kept.
+    out : ndarray, optional
+        An array (with dtype object) to output the geometries into.
     **kwargs
         For other keyword-only arguments, see the
         `NumPy ufunc docs <https://numpy.org/doc/stable/reference/ufuncs.html#ufuncs-kwargs>`_.
@@ -327,13 +357,13 @@ def multipoints(geometries, indices=None, **kwargs):
     ):
         geometries = points(geometries)
     if indices is None:
-        return lib.create_collection(geometries, typ, **kwargs)
+        return lib.create_collection(geometries, typ, out=out, **kwargs)
     else:
-        return collections_1d(geometries, indices, typ)
+        return collections_1d(geometries, indices, typ, out=out)
 
 
 @multithreading_enabled
-def multilinestrings(geometries, indices=None, **kwargs):
+def multilinestrings(geometries, indices=None, out=None, **kwargs):
     """Create multilinestrings from arrays of linestrings
 
     Parameters
@@ -343,8 +373,11 @@ def multilinestrings(geometries, indices=None, **kwargs):
     indices : array_like, optional
         Indices into the target array where input geometries belong. If
         provided, both geometries and indices should be 1D and have matching
-        sizes. Indices should be in increasing order. Missing indices will result
-        in a ValueError.
+        sizes. Indices should be in increasing order. Missing indices result
+        in a ValueError unless ``out`` is  provided, in which case the original
+        value in ``out`` is kept.
+    out : ndarray, optional
+        An array (with dtype object) to output the geometries into.
     **kwargs
         For other keyword-only arguments, see the
         `NumPy ufunc docs <https://numpy.org/doc/stable/reference/ufuncs.html#ufuncs-kwargs>`_.
@@ -362,13 +395,13 @@ def multilinestrings(geometries, indices=None, **kwargs):
         geometries = linestrings(geometries)
 
     if indices is None:
-        return lib.create_collection(geometries, typ, **kwargs)
+        return lib.create_collection(geometries, typ, out=out, **kwargs)
     else:
-        return collections_1d(geometries, indices, typ)
+        return collections_1d(geometries, indices, typ, out=out)
 
 
 @multithreading_enabled
-def multipolygons(geometries, indices=None, **kwargs):
+def multipolygons(geometries, indices=None, out=None, **kwargs):
     """Create multipolygons from arrays of polygons
 
     Parameters
@@ -378,8 +411,11 @@ def multipolygons(geometries, indices=None, **kwargs):
     indices : array_like, optional
         Indices into the target array where input geometries belong. If
         provided, both geometries and indices should be 1D and have matching
-        sizes. Indices should be in increasing order. Missing indices will result
-        in a ValueError.
+        sizes. Indices should be in increasing order. Missing indices result
+        in a ValueError unless ``out`` is  provided, in which case the original
+        value in ``out`` is kept.
+    out : ndarray, optional
+        An array (with dtype object) to output the geometries into.
     **kwargs
         For other keyword-only arguments, see the
         `NumPy ufunc docs <https://numpy.org/doc/stable/reference/ufuncs.html#ufuncs-kwargs>`_.
@@ -396,13 +432,13 @@ def multipolygons(geometries, indices=None, **kwargs):
     ):
         geometries = polygons(geometries)
     if indices is None:
-        return lib.create_collection(geometries, typ, **kwargs)
+        return lib.create_collection(geometries, typ, out=out, **kwargs)
     else:
-        return collections_1d(geometries, indices, typ)
+        return collections_1d(geometries, indices, typ, out=out)
 
 
 @multithreading_enabled
-def geometrycollections(geometries, indices=None, **kwargs):
+def geometrycollections(geometries, indices=None, out=None, **kwargs):
     """Create geometrycollections from arrays of geometries
 
     Parameters
@@ -412,8 +448,11 @@ def geometrycollections(geometries, indices=None, **kwargs):
     indices : array_like, optional
         Indices into the target array where input geometries belong. If
         provided, both geometries and indices should be 1D and have matching
-        sizes. Indices should be in increasing order. Missing indices will result
-        in a ValueError.
+        sizes. Indices should be in increasing order. Missing indices result
+        in a ValueError unless ``out`` is  provided, in which case the original
+        value in ``out`` is kept.
+    out : ndarray, optional
+        An array (with dtype object) to output the geometries into.
     **kwargs
         For other keyword-only arguments, see the
         `NumPy ufunc docs <https://numpy.org/doc/stable/reference/ufuncs.html#ufuncs-kwargs>`_.
@@ -425,9 +464,9 @@ def geometrycollections(geometries, indices=None, **kwargs):
     """
     typ = GeometryType.GEOMETRYCOLLECTION
     if indices is None:
-        return lib.create_collection(geometries, typ, **kwargs)
+        return lib.create_collection(geometries, typ, out=out, **kwargs)
     else:
-        return collections_1d(geometries, indices, typ)
+        return collections_1d(geometries, indices, typ, out=out)
 
 
 def prepare(geometry, **kwargs):
@@ -480,3 +519,36 @@ def destroy_prepared(geometry, **kwargs):
     prepare
     """
     lib.destroy_prepared(geometry, **kwargs)
+
+
+def empty(shape, geom_type=None, order="C"):
+    """Create a geometry array prefilled with None or with empty geometries.
+
+    Parameters
+    ----------
+    shape : int or tuple of int
+        Shape of the empty array, e.g., ``(2, 3)`` or ``2``.
+    geom_type : pygeos.GeometryType, optional
+        The desired geometry type in case the array should be prefilled
+        with empty geometries. Default ``None``.
+    order : {'C', 'F'}, optional, default: 'C'
+        Whether to store multi-dimensional data in row-major
+        (C-style) or column-major (Fortran-style) order in
+        memory.
+
+    Examples
+    --------
+    >>> empty((2, 3)).tolist()
+    [[None, None, None], [None, None, None]]
+    >>> empty(2, geom_type=GeometryType.POINT).tolist()
+    [<pygeos.Geometry POINT EMPTY>, <pygeos.Geometry POINT EMPTY>]
+    """
+    if geom_type is None:
+        return np.empty(shape, dtype=object, order=order)
+
+    geom_type = GeometryType(geom_type)  # cast int to GeometryType
+    if geom_type is GeometryType.MISSING:
+        return np.empty(shape, dtype=object, order=order)
+
+    fill_value = Geometry(geom_type.name + " EMPTY")
+    return np.full(shape, fill_value, dtype=object, order=order)

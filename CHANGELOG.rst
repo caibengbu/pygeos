@@ -1,16 +1,155 @@
 Changelog
 =========
 
-Version 0.11 (unreleased)
+Version 0.13 (unreleased)
 -------------------------
 
 **Major enhancements**
 
+* ...
+
 **API Changes**
 
-**Added GEOS Functions**
+* ...
 
 **Bug fixes**
+
+* ...
+
+
+**Acknowledgments**
+
+Thanks to everyone who contributed to this release!
+People with a "+" by their names contributed a patch for the first time.
+
+* Brendan Ward
+* Casper van der Wel
+* Joris Van den Bossche
+
+
+Version 0.12 (2021-12-03)
+-------------------------
+
+**Distribution**
+
+* Distribute binary wheels for Apple Silicon architecture
+  (arm64 and universal2) (#427).
+* Removed 32-bit architecture wheels for
+  Python 3.10 (#427).
+* All binary wheels now have GEOS 3.10.1. See https://github.com/libgeos/geos/blob/main/NEWS
+  for the changes (#422).
+* Linux x86_64 and i686 wheels are now built using the manylinux2014 image instead of manylinux2010 (#445).
+
+**Major enhancements**
+
+* Added ``pygeos.dwithin`` for GEOS >= 3.10 (#417).
+* Added ``dwithin`` predicate to ``STRtree`` ``query`` and ``query_bulk`` methods
+  to find geometries within a search distance for GEOS >= 3.10 (#425).
+* Added GeoJSON input/output capabilities (``pygeos.from_geojson``,
+  ``pygeos.to_geojson``) for GEOS >= 3.10 (#413).
+* Performance improvement in constructing LineStrings or LinearRings from
+  numpy arrays for GEOS >= 3.10 (#436)
+
+**API Changes**
+
+* When constructing a linearring through ``pygeos.linearrings`` or a polygon through
+  ``pygeos.polygons`` the ring is automatically closed when supplied with 3 coordinates
+  also when the first and last are already equal (#431).
+
+**Bug fixes**
+
+* Raise ``GEOSException`` in the rare case when predicate evalution in ``STRtree.query``
+  errors. Previously, the exceptions were ignored silently and the geometry was added
+  to the result (as if the predicate returned ``True``) (#432).
+* Hide ``RuntimeWarning`` when using ``total_bounds`` on empty geometries, empty arrays,
+  or geometries with NaN coordinates (#441).
+
+
+**Acknowledgments**
+
+Thanks to everyone who contributed to this release!
+People with a "+" by their names contributed a patch for the first time.
+
+* Brendan Ward
+* Casper van der Wel
+* Joris Van den Bossche
+
+
+Version 0.11.1 (2021-10-30)
+---------------------------
+
+**Distribution**
+
+* Distribute binary wheels for Python 3.10 (#416).
+* All binary wheels now have GEOS 3.10.0. See https://github.com/libgeos/geos/blob/main/NEWS
+  for the changes (#416).
+
+
+**Major enhancements**
+
+* Optionally output to a user-specified array (``out`` keyword argument) when constructing
+  geometries from ``indices`` (#380).
+* Added ``pygeos.empty`` to create a geometry array pre-filled with None or
+  with empty geometries (#381).
+* Added ``pygeos.force_2d`` and ``pygeos.force_3d`` to change the dimensionality of
+  the coordinates in a geometry (#396).
+* Added ``pygeos.testing.assert_geometries_equal`` (#401).
+
+**API Changes**
+
+* The default behaviour of ``pygeos.set_precision`` is now to always return valid geometries.
+  Before, the default was ``preserve_topology=False`` which caused confusion because
+  it mapped to GEOS_PREC_NO_TOPO (the new 'pointwise').
+  At the same time, GEOS < 3.10 implementation was not entirely correct so that some geometries
+  did and some did not preserve topology with this mode. Now, the new ``mode`` argument controls
+  the behaviour and the ``preserve_topology`` argument is deprecated (#410).
+* When constructing a linearring through ``pygeos.linearrings`` or a polygon through
+  ``pygeos.polygons`` now a ``ValueError`` is raised (instead of a ``GEOSException``)
+  if the ring contains less than 4 coordinates including ring closure (#378).
+* Removed deprecated ``normalize`` keyword argument in ``pygeos.line_locate_point`` and
+  ``pygeos.line_interpolate_point`` (#410).
+
+**Bug fixes**
+
+* Return True instead of False for LINEARRING geometries in ``is_closed`` (#379).
+* Fixed the WKB serialization of 3D empty points for GEOS >= 3.9.0 (#392).
+* Fixed the WKT serialization of single part 3D empty geometries for GEOS >= 3.9.0 (#402).
+* Fixed the WKT serialization of multipoints with empty points for GEOS >= 3.9.0 (#392).
+* Fixed a segfault when getting coordinates from empty points in GEOS 3.8.0 (#415).
+
+**Acknowledgments**
+
+Thanks to everyone who contributed to this release!
+People with a "+" by their names contributed a patch for the first time.
+
+* Brendan Ward
+* Casper van der Wel
+* Joris Van den Bossche
+
+
+Version 0.10.2 (2021-08-23)
+---------------------------
+
+**Distribution**
+
+Unittests are now included in the pygeos distribution. Run them by 1) installing
+``pytest`` (or ``pygeos[test]``) and 2) invoking ``pytest --pyargs pygeos.tests``.
+
+We started using a new tool for building binary wheels: ``cibuildwheel``. This
+resulted into the following improvements in the distributed binary wheels:
+
+* Windows binary wheels now contain mangled DLLs, which avoids conflicts
+  with other GEOS versions present on the system (a.k.a. 'DLL hell') (#365).
+* Windows binary wheels now contain the Microsoft Visual C++ Runtime Files
+  (msvcp140.dll) for usage on systems without the C++ redistributable (#365).
+* Linux x86_64 and i686 wheels are now built using the manylinux2010 image
+  instead of manylinux1 (#365).
+* Linux aarch64 wheels are now available for Python 3.9 (manylinux2014, #365).
+
+**Bug fixes**
+
+* Fixed operations on geometry arrays containing NULL instead of None.
+  These occur for instance by using ``numpy.empty_like`` (#371)
 
 **Acknowledgements**
 

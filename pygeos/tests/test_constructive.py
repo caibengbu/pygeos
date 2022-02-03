@@ -3,6 +3,7 @@ import pytest
 
 import pygeos
 from pygeos import Geometry, GEOSException
+from pygeos.testing import assert_geometries_equal
 
 from .common import (
     all_types,
@@ -10,6 +11,7 @@ from .common import (
     empty_line_string,
     empty_point,
     empty_polygon,
+    ignore_invalid,
     line_string,
     multi_point,
     point,
@@ -50,7 +52,12 @@ def test_float_arg_array(geometry, func):
         with pytest.raises(GEOSException, match="only accept linestrings"):
             func([geometry, geometry], 0.0)
         return
-    actual = func([geometry, geometry], 0.0)
+    # voronoi_polygons emits an "invalid" warning when supplied with an empty
+    # point (see https://github.com/libgeos/geos/issues/515)
+    with ignore_invalid(
+        func is pygeos.voronoi_polygons and pygeos.get_type_id(geometry) == 0
+    ):
+        actual = func([geometry, geometry], 0.0)
     assert actual.shape == (2,)
     assert isinstance(actual[0], Geometry)
 
@@ -208,7 +215,10 @@ def test_normalize(geom, expected):
 
 
 def test_offset_curve_empty():
-    actual = pygeos.offset_curve(empty_line_string, 2.0)
+    with ignore_invalid():
+        # Empty geometries emit an "invalid" warning
+        # (see https://github.com/libgeos/geos/issues/515)
+        actual = pygeos.offset_curve(empty_line_string, 2.0)
     assert pygeos.is_empty(actual)
 
 
@@ -271,9 +281,12 @@ def test_offset_curve_join_style_invalid():
                 "POLYGON((0 0, 0 10, 10 10, 10 0, 0 0), (2 2, 4 2, 4 4, 2 4, 2 2))"
             ),
         ),
-        (
+        pytest.param(
             pygeos.Geometry("MULTILINESTRING ((0 0, 1 2), (3 3, 4 4))"),
             pygeos.Geometry("MULTILINESTRING ((1 2, 0 0), (4 4, 3 3))"),
+            marks=pytest.mark.skipif(
+                pygeos.geos_version < (3, 8, 1), reason="GEOS < 3.8.1"
+            ),
         ),
         (
             pygeos.Geometry(
@@ -295,7 +308,7 @@ def test_offset_curve_join_style_invalid():
     ],
 )
 def test_reverse(geom, expected):
-    assert pygeos.equals(pygeos.reverse(geom), expected)
+    assert_geometries_equal(pygeos.reverse(geom), expected)
 
 
 @pytest.mark.skipif(pygeos.geos_version < (3, 7, 0), reason="GEOS < 3.7")
@@ -307,7 +320,7 @@ def test_reverse_none():
     expected = pygeos.Geometry("POLYGON ((0 0,  0 1, 1 1, 1 0, 0 0))")
     result = pygeos.reverse([None, geometry])
     assert result[0] is None
-    assert pygeos.equals(result[1], expected)
+    assert_geometries_equal(result[1], expected)
 
 
 @pytest.mark.skipif(pygeos.geos_version < (3, 7, 0), reason="GEOS < 3.7")
@@ -339,7 +352,7 @@ def test_reverse_invalid_type(geom):
 def test_clip_by_rect(geom, expected):
     geom, expected = pygeos.Geometry(geom), pygeos.Geometry(expected)
     actual = pygeos.clip_by_rect(geom, 10, 10, 20, 20)
-    assert pygeos.equals(actual, expected)
+    assert_geometries_equal(actual, expected)
 
 
 @pytest.mark.parametrize(
@@ -374,7 +387,7 @@ def test_clip_by_rect(geom, expected):
 def test_clip_by_rect_polygon(geom, rect, expected):
     geom, expected = pygeos.Geometry(geom), pygeos.Geometry(expected)
     actual = pygeos.clip_by_rect(geom, *rect)
-    assert pygeos.equals(actual, expected)
+    assert_geometries_equal(actual, expected)
 
 
 @pytest.mark.parametrize("geometry", all_types)
@@ -605,14 +618,14 @@ def test_segmentize_tolerance_nan(geometry):
 )
 def test_segmentize_empty(geometry):
     actual = pygeos.segmentize(geometry, tolerance=5)
-    assert pygeos.equals(actual, geometry).all()
+    assert_geometries_equal(actual, geometry)
 
 
 @pytest.mark.skipif(pygeos.geos_version < (3, 10, 0), reason="GEOS < 3.10")
 @pytest.mark.parametrize("geometry", [point, point_z, multi_point])
 def test_segmentize_no_change(geometry):
     actual = pygeos.segmentize(geometry, tolerance=5)
-    assert pygeos.equals(actual, geometry).all()
+    assert_geometries_equal(actual, geometry)
 
 
 @pytest.mark.skipif(pygeos.geos_version < (3, 10, 0), reason="GEOS < 3.10")
@@ -686,7 +699,7 @@ def test_segmentize_none():
 )
 def test_segmentize(geometry, tolerance, expected):
     actual = pygeos.segmentize(geometry, tolerance)
-    assert pygeos.equals(actual, geometry).all()
+    assert_geometries_equal(actual, expected)
 
 
 @pytest.mark.skipif(pygeos.geos_version < (3, 8, 0), reason="GEOS < 3.8")
@@ -728,7 +741,7 @@ def test_minimum_bounding_circle_all_types(geometry):
 )
 def test_minimum_bounding_circle(geometry, expected):
     actual = pygeos.minimum_bounding_circle(geometry)
-    assert pygeos.equals(actual, expected).all()
+    assert_geometries_equal(actual, expected)
 
 
 @pytest.mark.skipif(pygeos.geos_version < (3, 6, 0), reason="GEOS < 3.6")
