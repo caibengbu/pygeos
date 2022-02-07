@@ -541,7 +541,12 @@ static PyObject* STRtree_query_bulk(STRtreeObject* self, PyObject* args) {
     }
 
     kv_destroy(query_geoms);
+    float percentage = 0.0;
+    percentage = (float)i/n*100;
+    printf("\rIn progress at %.2f %%, working on number %d, total number of geometries %d", percentage, i, n);
+    fflush(stdout);
   }
+  printf("\n");
 
   GEOS_FINISH_THREADS;
 
@@ -1258,7 +1263,7 @@ static PyObject* STRtree_dwithin(STRtreeObject* self, PyObject* args) {
         
       float percentage = 0.0;
       percentage = (float)j/size*100;
-      printf("\rIn progress at %.2f %%, working on number %d, total number of geometry in the tree %d", percentage, j, size);
+      printf("\rIn progress at %.2f %%, working on number %d, total number of geometry in the tree in query window %d", percentage, j, size);
       fflush(stdout);
     }
     printf("\n");
